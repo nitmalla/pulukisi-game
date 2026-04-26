@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dino Game</title>
+  <style>
+    body {
+      text-align: center;
+      background: #f7f7f7;
+      font-family: Arial;
+    }
+    canvas {
+      background: white;
+      border: 2px solid #333;
+      display: block;
+      margin: 20px auto;
+    }
+    button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Pulukisi Game </h2>
+
+<canvas id="game" width="850" height="200"></canvas>
+
+<div>
+  <button onclick="startGame()">Start</button>
+  <button onclick="pauseGame()">Pause</button>
+  <button onclick="stopGame()">Stop</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let isGameOver = false;
+let gameRunning = false;
+let animationId;
+let frame = 0;
+
+let dino, cactus, score, speed;
+let bgX = 0;
+
+let highScore = localStorage.getItem("highScore") || 0;
+
+
+// Images
+const dinoImg = new Image();
+dinoImg.src = "images/dino.png";
+
+const cactusImg = new Image();
+cactusImg.src = "images/cactus.png";
+
+const bgImg = new Image();
+bgImg.src = "images/bg.png";
+
+// Sounds
+const jumpSound = new Audio("sounds/jump.mp3");
+const gameOverSound = new Audio("sounds/gameover.mp3");
+const bgMusic = new Audio("sounds/background.mp3");
+bgMusic.loop = true;
+
+// Init game
+function initGame() {
+  dino = {
+    x: 50,
+    y: 140,
+    width: 50,
+    height: 50,
+    vy: 0,
+    gravity: 1.2,
+    jumpPower: -18,
+    grounded: true
+  };
+
+  cactus = {
+    x: 800,
+    y: 140,
+    width: 40,
+    height: 50
+  };
+
+  score = 0;
+  speed = 4;
+  bgX = 0;
+  frame = 0;
+  isGameOver = false;
+}
+
+// Update game
+function update() {
+  frame++;
+
+  // Gravity
+  dino.vy += dino.gravity;
+  dino.y += dino.vy;
+
+  if (dino.y >= 140) {
+    dino.y = 140;
+    dino.vy = 0;
+    dino.grounded = true;
+  }
+
+  // Move cactus
+  cactus.x -= speed;
+  if (cactus.x < -40) {
+    cactus.x = 800 + Math.random() * 200;
+    score++;
+if (score > highScore) {
+  highScore = score;
+  localStorage.setItem("highScore", highScore);
+}
+
+  }
+
+  // Background scroll
+  bgX -= speed * 0.5;
+  if (bgX <= -canvas.width) {
+    bgX = 0;
+  }
+
+  // Increase difficulty
+  speed += 0.002;
+
+  // Collision
+  if (
+    dino.x < cactus.x + cactus.width &&
+    dino.x + dino.width > cactus.x &&
+    dino.y < cactus.y + cactus.height &&
+    dino.y + dino.height > cactus.y
+  ) {
+    gameOver();
+  }
+}
+
+// Draw everything
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background scrolling
+  if (bgImg.complete) {
+    ctx.drawImage(bgImg, bgX, 0, canvas.width, canvas.height);
+    ctx.drawImage(bgImg, bgX + canvas.width, 0, canvas.width, canvas.height);
+  }
+
+  // 🦖 Fake running animation
+  ctx.save();
+
+  let bounce = 0;
+  let tilt = 0;
+
+  if (dino.grounded) {
+    bounce = Math.sin(frame * 0.3) * 5;
+    tilt = Math.sin(frame * 0.3) * 0.05;
+  }
+
+  ctx.translate(
+    dino.x + dino.width / 2,
+    dino.y + dino.height / 2 + bounce
+  );
+  ctx.rotate(tilt);
+
+  ctx.drawImage(
+    dinoImg,
+    -dino.width / 2,
+    -dino.height / 2,
+    dino.width,
+    dino.height
+  );
+
+  ctx.restore();
+
+  // 🌵 Cactus
+  ctx.drawImage(cactusImg, cactus.x, cactus.y, cactus.width, cactus.height);
+
+  // Score
+  ctx.fillStyle = "black";
+  ctx.font = "16px Arial";
+  ctx.fillText("Score: " + score, 700, 20);
+  ctx.fillText("High Score: " + highScore, 700, 40);
+
+}
+
+// Game loop
+function gameLoop() {
+  if (!gameRunning) return;
+
+  update();
+  draw();
+  animationId = requestAnimationFrame(gameLoop);
+}
+
+// Game over
+function gameOver() {
+ gameRunning = false;
+  isGameOver = true;
+  cancelAnimationFrame(animationId);
+
+  gameOverSound.play();
+  bgMusic.pause();
+
+  // Overlay + text
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "black";
+  ctx.font = "30px Arial";
+  ctx.fillText("GAME OVER", 300, 80);
+  ctx.font = "20px Arial";
+  ctx.fillText("Score: " + score, 340, 110);
+  ctx.fillText("Press R or Click to Restart", 250, 150);
+  ctx.fillText("High Score: " + highScore, 320, 130);
+  // Countdown before restart
+  let countdown = 3;
+  let countdownInterval = setInterval(() => {
+    ctx.clearRect(0, 130, canvas.width, 50); // clear old countdown
+    ctx.fillStyle = "black";
+    ctx.font = "25px Arial";
+    ctx.fillText("Restarting in " + countdown + "...", 300, 150);
+
+    countdown--;
+
+    if (countdown < 0) {
+      clearInterval(countdownInterval);
+      initGame();
+  startGame();
+ // stopGame();
+    }
+  }, 1000);
+}
+
+
+// Controls
+function startGame() {
+ if (!gameRunning) {
+    gameRunning = true;
+    bgMusic.currentTime = 0;
+    bgMusic.play();
+    gameLoop();
+  }
+}
+
+function pauseGame() {
+  gameRunning = false;
+  cancelAnimationFrame(animationId);
+}
+
+function stopGame() {
+  gameRunning = false;
+  cancelAnimationFrame(animationId);
+  initGame();
+  draw();
+}
+
+// Jump
+function jump() {
+   if (dino.grounded) {
+    dino.vy = dino.jumpPower;
+    dino.grounded = false;
+    jumpSound.play();
+  }
+}
+
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    if (!isGameOver) jump();
+  }
+
+  if (e.code === "KeyR" && isGameOver) {
+    initGame();
+    startGame();
+  }
+});
+
+canvas.addEventListener("touchstart", () => {
+  if (isGameOver) {
+    initGame();
+    startGame();
+  } else {
+    jump();
+  }
+});
+
+// Also keep click for desktop
+canvas.addEventListener("click", () => {
+  if (isGameOver) {
+    initGame();
+    startGame();
+  } else {
+    jump();
+  }
+});
+
+
+// Start
+window.onload = () => {
+  initGame();
+  draw();
+};
+</script>
+
+</body>
+</html>
